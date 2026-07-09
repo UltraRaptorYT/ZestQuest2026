@@ -13,6 +13,9 @@ import {
   type Team,
 } from "@/lib/zestquest";
 
+const MAX_SELFIE_EDGE = 1600;
+const TARGET_SELFIE_BYTES = 1_500_000;
+
 export default function AddGroupSelfie() {
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
@@ -106,7 +109,8 @@ export default function AddGroupSelfie() {
       return;
     }
 
-    const extension = file.name.split(".").pop()?.toLowerCase() || "jpg";
+    const uploadFile = await prepareSelfieFile(file);
+    const extension = uploadFile.type === "image/png" ? "png" : "jpg";
     const safeTeamName = selectedTeam.team_name
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "-")
@@ -116,8 +120,9 @@ export default function AddGroupSelfie() {
     setUploading(true);
     const uploadResult = await supabase.storage
       .from(GROUP_SELFIES_BUCKET)
-      .upload(path, file, {
+      .upload(path, uploadFile, {
         cacheControl: "31536000",
+        contentType: uploadFile.type,
         upsert: true,
       });
 
@@ -238,4 +243,63 @@ export default function AddGroupSelfie() {
       </Button>
     </div>
   );
+}
+
+async function prepareSelfieFile(file: File) {
+  if (!file.type.startsWith("image/") || file.size <= TARGET_SELFIE_BYTES) {
+    return file;
+  }
+
+  try {
+    const bitmap = await createImageBitmap(file);
+    const scale = Math.min(
+      1,
+      MAX_SELFIE_EDGE / Math.max(bitmap.width, bitmap.height),
+    );
+    const width = Math.max(1, Math.round(bitmap.width * scale));
+    const height = Math.max(1, Math.round(bitmap.height * scale));
+
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+
+    const context = canvas.getContext("2d");
+    if (!context) {
+      bitmap.close();
+      return file;
+    }
+
+    context.drawImage(bitmap, 0, 0, width, height);
+    bitmap.close();
+
+    let quality = 0.85;
+    let blob = await canvasToBlob(canvas, quality);
+
+    while (blob.size > TARGET_SELFIE_BYTES && quality > 0.5) {
+      quality -= 0.1;
+      blob = await canvasToBlob(canvas, quality);
+    }
+
+    return new File([blob], file.name.replace(/\.[^.]+$/, ".jpg"), {
+      type: "image/jpeg",
+    });
+  } catch {
+    return file;
+  }
+}
+
+function canvasToBlob(canvas: HTMLCanvasElement, quality: number) {
+  return new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => {
+        if (blob) {
+          resolve(blob);
+        } else {
+          reject(new Error("Could not compress image"));
+        }
+      },
+      "image/jpeg",
+      quality,
+    );
+  });
 }

@@ -3,8 +3,8 @@ values (
   'zestquest-26-group-selfies',
   'zestquest-26-group-selfies',
   true,
-  5242880,
-  array['image/jpeg', 'image/png', 'image/webp', 'image/gif']
+  20971520,
+  array['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/heic', 'image/heif']
 )
 on conflict (id) do update set
   public = excluded.public,
