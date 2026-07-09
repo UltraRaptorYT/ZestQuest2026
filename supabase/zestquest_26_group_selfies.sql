@@ -55,6 +55,19 @@ begin
 
   if not exists (
     select 1 from pg_policies
+    where schemaname = 'storage'
+      and tablename = 'objects'
+      and policyname = 'Enable group selfie deletes for all users'
+  ) then
+    create policy "Enable group selfie deletes for all users"
+    on storage.objects
+    for delete
+    to anon
+    using (bucket_id = 'zestquest-26-group-selfies');
+  end if;
+
+  if not exists (
+    select 1 from pg_policies
     where schemaname = 'public'
       and tablename = 'zestquest_26_team'
       and policyname = 'Enable selfie updates for all users'

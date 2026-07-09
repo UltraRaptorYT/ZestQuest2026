@@ -1,7 +1,7 @@
 "use client";
 
 import { ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
-import { Camera, ImagePlus, Upload } from "lucide-react";
+import { Camera, ImagePlus, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -24,6 +24,7 @@ export default function AddGroupSelfie() {
   const [file, setFile] = useState<File | null>(null);
   const [loadingTeams, setLoadingTeams] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     const frameId = window.requestAnimationFrame(() => {
@@ -165,6 +166,63 @@ export default function AddGroupSelfie() {
     });
   }
 
+  async function deleteSelfie() {
+    if (file) {
+      setFile(null);
+      toast.success("Selected selfie cleared.");
+      return;
+    }
+
+    if (!selectedTeam) {
+      toast.error("Select a group first.");
+      return;
+    }
+
+    if (!selectedTeam.selfie) {
+      toast.error("This group does not have a selfie.");
+      return;
+    }
+
+    setDeleting(true);
+    const updateResult = await supabase
+      .from(TEAM_TABLE)
+      .update({ selfie: null })
+      .eq("id", selectedTeam.id)
+      .select("id, team_name, selfie, created_at")
+      .single();
+
+    if (updateResult.error) {
+      setDeleting(false);
+      toast.error("Selfie was not deleted", {
+        description: updateResult.error.message,
+      });
+      return;
+    }
+
+    const storagePath = getSelfieStoragePath(selectedTeam.selfie);
+    if (storagePath) {
+      const removeResult = await supabase.storage
+        .from(GROUP_SELFIES_BUCKET)
+        .remove([storagePath]);
+
+      if (removeResult.error) {
+        toast.error("Selfie was cleared, but file removal failed", {
+          description: removeResult.error.message,
+        });
+      }
+    }
+
+    setDeleting(false);
+    setTeams((currentTeams) =>
+      currentTeams.map((team) =>
+        team.id === updateResult.data.id ? updateResult.data : team,
+      ),
+    );
+    toast.success("Group selfie deleted", {
+      description: selectedTeam.team_name,
+    });
+  }
+
   return (
     <div className="flex flex-col gap-4">
       <label className="flex flex-col gap-1.5 text-sm font-medium">
@@ -236,13 +294,40 @@ export default function AddGroupSelfie() {
       <Button
         type="button"
         onClick={uploadSelfie}
-        disabled={uploading || loadingTeams || teams.length === 0}
+        disabled={uploading || deleting || loadingTeams || teams.length === 0}
       >
         <Upload />
         {uploading ? "Uploading..." : "Save selfie"}
       </Button>
+
+      <Button
+        type="button"
+        variant="destructive"
+        onClick={deleteSelfie}
+        disabled={
+          uploading ||
+          deleting ||
+          loadingTeams ||
+          teams.length === 0 ||
+          (!file && !selectedTeam?.selfie)
+        }
+      >
+        <Trash2 />
+        {deleting ? "Deleting..." : file ? "Clear selected selfie" : "Delete selfie"}
+      </Button>
     </div>
   );
+}
+
+function getSelfieStoragePath(publicUrl: string) {
+  const marker = `/object/public/${GROUP_SELFIES_BUCKET}/`;
+  const markerIndex = publicUrl.indexOf(marker);
+
+  if (markerIndex === -1) {
+    return "";
+  }
+
+  return decodeURIComponent(publicUrl.slice(markerIndex + marker.length));
 }
 
 async function prepareSelfieFile(file: File) {
