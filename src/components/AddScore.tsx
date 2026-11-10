@@ -6,11 +6,15 @@ import { toast } from "sonner";
 import supabase from "@/lib/supabase";
 import {
   SCORE_LOG_TABLE,
-  SELECTED_TEAM_STORAGE_KEY,
   TEAM_TABLE,
   type ScoreLog,
   type Team,
 } from "@/lib/zestquest";
+import {
+  getSelectedTeam,
+  saveSelectedTeam,
+  subscribeToSelectedTeam,
+} from "@/lib/selectedTeam";
 
 const scoreButtons = [-1, 1, -5, 5, -10, 10];
 
@@ -23,12 +27,7 @@ export default function AddScore({ admin = false }: { admin?: boolean }) {
   const [savingScore, setSavingScore] = useState<number | null>(null);
 
   useEffect(() => {
-    const frameId = window.requestAnimationFrame(() => {
-      const savedTeam = window.localStorage.getItem(SELECTED_TEAM_STORAGE_KEY);
-      if (savedTeam) {
-        setTeamName(savedTeam);
-      }
-    });
+    const unsubscribeFromTeam = subscribeToSelectedTeam(setTeamName);
 
     async function loadTeams() {
       setLoadingTeams(true);
@@ -42,9 +41,18 @@ export default function AddScore({ admin = false }: { admin?: boolean }) {
           description: error.message,
         });
       } else {
-        setTeams(data ?? []);
-        if (data?.[0] && !window.localStorage.getItem(SELECTED_TEAM_STORAGE_KEY)) {
-          setTeamName(data[0].team_name);
+        const availableTeams = data ?? [];
+        setTeams(availableTeams);
+
+        const savedTeam = getSelectedTeam();
+        const selectedTeamName = availableTeams.some(
+          (team) => team.team_name === savedTeam,
+        )
+          ? savedTeam
+          : (availableTeams[0]?.team_name ?? "");
+        setTeamName(selectedTeamName);
+        if (selectedTeamName && selectedTeamName !== savedTeam) {
+          saveSelectedTeam(selectedTeamName);
         }
       }
       setLoadingTeams(false);
@@ -67,7 +75,7 @@ export default function AddScore({ admin = false }: { admin?: boolean }) {
     loadTeams();
     loadScores();
 
-    return () => window.cancelAnimationFrame(frameId);
+    return unsubscribeFromTeam;
   }, []);
 
   const selectedTeam = useMemo(
@@ -85,7 +93,7 @@ export default function AddScore({ admin = false }: { admin?: boolean }) {
 
   function handleTeamChange(value: string) {
     setTeamName(value);
-    window.localStorage.setItem(SELECTED_TEAM_STORAGE_KEY, value);
+    saveSelectedTeam(value);
   }
 
   async function addScore(scoreValue: number) {

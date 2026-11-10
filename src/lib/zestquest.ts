@@ -1,6 +1,8 @@
 export const TEAM_TABLE = "zestquest_26_team";
 export const SCORE_LOG_TABLE = "zestquest_26_score_log";
 export const SCOREBOARD_STATE_TABLE = "zestquest_26_scoreboard_state";
+export const GALAXY_TRANSMISSION_STATE_TABLE =
+  "zestquest_26_galaxy_transmission_state";
 export const GROUP_SELFIES_BUCKET = "zestquest-26-group-selfies";
 export const SELECTED_TEAM_STORAGE_KEY = "zestquest_26_selected_team";
 

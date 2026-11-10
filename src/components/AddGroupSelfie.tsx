@@ -8,10 +8,14 @@ import { Button } from "@/components/ui/button";
 import supabase from "@/lib/supabase";
 import {
   GROUP_SELFIES_BUCKET,
-  SELECTED_TEAM_STORAGE_KEY,
   TEAM_TABLE,
   type Team,
 } from "@/lib/zestquest";
+import {
+  getSelectedTeam,
+  saveSelectedTeam,
+  subscribeToSelectedTeam,
+} from "@/lib/selectedTeam";
 
 const MAX_SELFIE_EDGE = 1600;
 const TARGET_SELFIE_BYTES = 1_500_000;
@@ -27,12 +31,7 @@ export default function AddGroupSelfie() {
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
-    const frameId = window.requestAnimationFrame(() => {
-      const savedTeam = window.localStorage.getItem(SELECTED_TEAM_STORAGE_KEY);
-      if (savedTeam) {
-        setTeamName(savedTeam);
-      }
-    });
+    const unsubscribeFromTeam = subscribeToSelectedTeam(setTeamName);
 
     async function loadTeams() {
       setLoadingTeams(true);
@@ -46,9 +45,18 @@ export default function AddGroupSelfie() {
           description: error.message,
         });
       } else {
-        setTeams(data ?? []);
-        if (data?.[0] && !window.localStorage.getItem(SELECTED_TEAM_STORAGE_KEY)) {
-          setTeamName(data[0].team_name);
+        const availableTeams = data ?? [];
+        setTeams(availableTeams);
+
+        const savedTeam = getSelectedTeam();
+        const selectedTeamName = availableTeams.some(
+          (team) => team.team_name === savedTeam,
+        )
+          ? savedTeam
+          : (availableTeams[0]?.team_name ?? "");
+        setTeamName(selectedTeamName);
+        if (selectedTeamName && selectedTeamName !== savedTeam) {
+          saveSelectedTeam(selectedTeamName);
         }
       }
       setLoadingTeams(false);
@@ -56,7 +64,7 @@ export default function AddGroupSelfie() {
 
     loadTeams();
 
-    return () => window.cancelAnimationFrame(frameId);
+    return unsubscribeFromTeam;
   }, []);
 
   const selectedTeam = useMemo(
@@ -83,7 +91,7 @@ export default function AddGroupSelfie() {
 
   function handleTeamChange(value: string) {
     setTeamName(value);
-    window.localStorage.setItem(SELECTED_TEAM_STORAGE_KEY, value);
+    saveSelectedTeam(value);
   }
 
   function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
