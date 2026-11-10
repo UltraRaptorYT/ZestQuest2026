@@ -16,7 +16,7 @@ import {
   subscribeToSelectedTeam,
 } from "@/lib/selectedTeam";
 
-const scoreButtons = [-1, 1, -5, 5, -10, 10];
+const scoreButtons = [-5, 5, -10, 10, -20, 20];
 
 export default function AddScore({ admin = false }: { admin?: boolean }) {
   const [teams, setTeams] = useState<Team[]>([]);

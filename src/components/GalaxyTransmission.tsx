@@ -96,10 +96,10 @@ export default function GalaxyTransmission({
   const [selectedTeam, setSelectedTeam] = useState("");
   const [loadingTeams, setLoadingTeams] = useState(false);
   const [awardingPoints, setAwardingPoints] = useState(false);
-  const gridHeightOffset = admin ? 370 : 240;
+  const gridHeightOffset = 300;
 
   useEffect(() => {
-    if (!admin) return;
+    if (admin) return;
     const unsubscribeFromTeam = subscribeToSelectedTeam(setSelectedTeam);
 
     async function loadTeams() {
@@ -300,14 +300,14 @@ export default function GalaxyTransmission({
   }
 
   async function awardPoints() {
-    if (!admin || !selectedTeam || awardingPoints) return;
+    if (admin || !selectedTeam || awardingPoints) return;
 
     setAwardingPoints(true);
     const { error: scoreError } = await supabase.from(SCORE_LOG_TABLE).insert({
       team_name: selectedTeam,
       score: 10,
-      added_by: "Admin",
-      is_admin: true,
+      added_by: "User",
+      is_admin: false,
       remarks: `Galaxy Transmission grid ${gridState?.round ?? ""} completed correctly`,
     });
     setAwardingPoints(false);
@@ -400,7 +400,7 @@ export default function GalaxyTransmission({
         </nav>
       ) : null}
 
-      {admin ? (
+      {!admin ? (
         <div className="flex items-end gap-2">
           <label className="flex min-w-0 flex-1 flex-col gap-1 text-xs font-medium text-muted-foreground">
             Group
